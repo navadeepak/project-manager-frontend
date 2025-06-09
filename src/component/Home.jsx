@@ -3,38 +3,6 @@ import React, { useEffect, useState } from "react";
 import axiosInstance from "../utilities/AxiosInstance";
 import { toast, Toaster } from "sonner";
 
-const dummyData = [
-  {
-    id: 1,
-    name: "Project A",
-    description: "Description of Project A",
-    repo_link: "https://github.com/user/project-a",
-    live_link: "https://project-a.com",
-    image: "https://via.placeholder.com/150",
-    tech_stack: ["React", "Node.js", "MongoDB"],
-  },
-  {
-    id: 2,
-    name: "Project B",
-    description: "Description of Project B",
-    status: "Completed",
-    repo_link: "https://github.com/user/project-b",
-    live_link: "https://project-b.com",
-    image: "https://via.placeholder.com/150",
-    tech_stack: ["Vue.js", "Express", "MySQL"],
-  },
-  {
-    id: 3,
-    name: "Project C",
-    description: "Description of Project C",
-    status: "Not Started",
-    repo_link: "https://github.com/user/project-c",
-    live_link: "https://project-c.com",
-    image: "https://via.placeholder.com/150",
-    tech_stack: ["Angular", "Django", "PostgreSQL"],
-  },
-];
-
 function Home() {
   const [addProjectModal, setAddProjectModal] = useState(false);
   const [formData, setFormData] = useState({});
@@ -84,22 +52,39 @@ function Home() {
           formDataToSend.append(key, value);
         }
       });
-      const response = await axiosInstance.post(
-        "/projects/create",
-        formDataToSend,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+
+      let response;
+      if (formData._id) {
+        response = await axiosInstance.patch(
+          `/projects/edit/${formData._id}`,
+          formDataToSend,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+        toast.success("Project Updated Successfully");
+      } else {
+        response = await axiosInstance.post(
+          "/projects/create",
+          formDataToSend,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+        toast.success("Project Added Successfully");
+      }
+
       console.log("Response:", response.data);
-      toast.success("Project Added Successfully");
       setAddProjectModal(false);
       setFormData({});
+      getAllProjects();
     } catch (error) {
       console.error("Error:", error);
-      toast.error("Error Adding Project");
+      toast.error(id ? "Error Updating Project" : "Error Adding Project");
     }
   };
 
@@ -122,28 +107,28 @@ function Home() {
         {projects.map((project, index) => (
           <div
             key={index}
-            className="flex flex-row items-center justify-center p-4 text-white cursor-pointer bg-blue-500 w-[425px] h-60 rounded gap-4"
+            className="flex flex-row items-center justify-center p-4 text-white cursor-pointer bg-blue-500 min-w-fit h-60 rounded gap-4"
           >
-            <div>
+            <div className="flex flex-col h-full gap-2 w-64">
               <h2 className="text-2xl font-bold flex flex-row items-center">
                 <Icon icon="line-md:hash" width="24" height="24" />
                 {project.name}
               </h2>
-              <p className="mt-2">{project.description}</p>
-              <p className="mt-2">
-                Tech Stack:{" "}
-                <span className="font-semibold">
+              <p className="">
+                <span className="font-bold text-black">Tech Stack: </span>
+                <span className="">
                   {Array.isArray(project?.tech_stack)
                     ? project.tech_stack.join(", ")
                     : project?.tech_stack}
                 </span>{" "}
               </p>
+              <p className="text-wrap w-56">{project.description}</p>
             </div>
-            <div className="flex flex-col group bg-[#ffffff30] overflow-hidden rounded-md h-52 w-full items-center justify-center relative">
+            <div className="flex flex-col group bg-[#ffffff30] overflow-hidden rounded-md h-52 w-80 items-center justify-center relative">
               <img
                 src={project.image}
                 alt={project.name}
-                className="w-24 rounded absolute group-hover:hidden flex"
+                className="h-36 rounded absolute group-hover:hidden flex"
               />
               <div className="hidden flex-col group-hover:flex gap-2 w-44 text-nowrap px-4">
                 <a
@@ -163,7 +148,14 @@ function Home() {
                   Live Link
                 </a>
                 {location.pathname === "/admin" && (
-                  <button className="bg-[#00000050] text-white p-2 rounded w-full">
+                  <button
+                    onClick={() => {
+                      setAddProjectModal(true);
+                      // getProjectById(project._id);
+                      setFormData(project);
+                    }}
+                    className="bg-[#00000050] text-white p-2 rounded w-full"
+                  >
                     Edit Project
                   </button>
                 )}
@@ -173,12 +165,17 @@ function Home() {
         ))}
       </div>
       {addProjectModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
           <div className="bg-white p-6 rounded shadow-lg w-96">
             <div className="mb-4 flex flex-row items-center justify-between">
-              <h2 className="text-xl font-semibold">Add New Project</h2>
+              <h2 className="text-xl font-semibold">
+                {formData._id ? "Edit Project" : "Add New Project"}
+              </h2>
               <button
-                onClick={() => setAddProjectModal(false)}
+                onClick={() => {
+                  setAddProjectModal(false);
+                  setFormData({});
+                }}
                 className="hover:text-red-500 text-gray-600 hover:scale-110 ease-in-out duration-150 bg-gray-200 rounded-full"
               >
                 <Icon icon="line-md:close-small" width="24" height="24" />
@@ -189,7 +186,7 @@ function Home() {
                 type="text"
                 placeholder="Project Name"
                 name="name"
-                value={formData.name}
+                value={formData.name || ""}
                 onChange={handleInputChange}
                 className="w-full p-2 mb-4 border rounded"
                 required
@@ -197,16 +194,19 @@ function Home() {
               <textarea
                 placeholder="Project Description"
                 name="description"
-                value={formData.description}
+                value={formData.description || ""}
                 onChange={handleInputChange}
                 className="w-full p-2 mb-4 border rounded"
-                required
               ></textarea>
               <input
                 type="text"
                 placeholder="Tech Stack (comma separated)"
                 name="tech_stack"
-                value={formData.tech_stack}
+                value={
+                  Array.isArray(formData.tech_stack)
+                    ? formData.tech_stack.join(", ")
+                    : formData.tech_stack || ""
+                }
                 onChange={handleInputChange}
                 className="w-full p-2 mb-4 border rounded"
                 required
@@ -215,7 +215,7 @@ function Home() {
                 type="url"
                 placeholder="Repository Link"
                 name="repo_link"
-                value={formData.repo_link}
+                value={formData.repo_link || ""}
                 onChange={handleInputChange}
                 className="w-full p-2 mb-4 border rounded"
                 required
@@ -224,7 +224,7 @@ function Home() {
                 type="url"
                 placeholder="Live Link"
                 name="live_link"
-                value={formData.live_link}
+                value={formData.live_link || ""}
                 onChange={handleInputChange}
                 className="w-full p-2 mb-4 border rounded"
                 required
@@ -235,13 +235,14 @@ function Home() {
                 onChange={handleFileChange}
                 accept="image/*"
                 className="w-full p-2 mb-4 border rounded"
-                required
+                required={!formData._id}
               />
+              {formData.image && <img src={formData.image} alt="" />}
               <button
                 type="submit"
                 className="bg-blue-500 text-white p-2 rounded w-full"
               >
-                Add Project
+                {formData._id ? "Update Project" : "Add Project"}
               </button>
             </form>
           </div>
